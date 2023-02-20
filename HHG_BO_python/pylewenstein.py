@@ -17,18 +17,19 @@ Ry = h*c * m_e*e**4/8/eps0**2/h**3/c
 rootdir = os.path.dirname(os.path.realpath(__file__))
 
 if os.name=="posix":
-  lewenstein_so = ctypes.CDLL(os.path.join(rootdir,'lewenstein.so'))
+    lewenstein_so = ctypes.CDLL(os.path.join(rootdir,'lewenstein.so'))
 elif os.name=="nt":
-  bits = ctypes.sizeof(ctypes.c_voidp)*8
-  archdirectory = os.path.join(rootdir,'dll' + str(bits))
+    #os.add_dll_directory('C:\\Users\\chaof\\Documents\\GitHub\\HHG_optimisation\\HHG_BO_python')
+    bits = ctypes.sizeof(ctypes.c_voidp)*8
+    archdirectory = os.path.join(rootdir,'dll' + str(bits))
 
-  rootdirdll = os.path.join(rootdir,'lewenstein.dll')
-  correctdll = os.path.join(archdirectory,'lewenstein.dll')
-  if not os.path.exists(rootdirdll) or os.path.getsize(rootdirdll)!=os.path.getsize(correctdll):
-    for filename in os.listdir(archdirectory): # for dependencies
-      shutil.copy(os.path.join(archdirectory,filename), rootdir)
+    rootdirdll = os.path.join(rootdir,'lewenstein.dll')
+    correctdll = os.path.join(archdirectory,'lewenstein.dll')
+    if not os.path.exists(rootdirdll) or os.path.getsize(rootdirdll)!=os.path.getsize(correctdll):
+        for filename in os.listdir(archdirectory): # for dependencies
+            shutil.copy(os.path.join(archdirectory,filename), rootdir)
 
-  lewenstein_so = ctypes.CDLL(os.path.join(rootdir,'lewenstein'))
+    lewenstein_so = ctypes.CDLL(os.path.join(rootdir,'lewenstein'))
 
 # Note: explicitly setting lewenstein_so.*.argtypes/restype is necessary to prevent segfault on 64 bit:
 # http://stackoverflow.com/questions/17240621/wrapping-simple-c-example-with-ctypes-segmentation-fault
