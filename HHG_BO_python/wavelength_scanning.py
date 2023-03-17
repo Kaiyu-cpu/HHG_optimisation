@@ -122,8 +122,10 @@ for wavelength in range (800,2001):
     
     # remove low energies 
     energy = x * h_bar * omega_0
-    x = x[energy > ionization_potential]
-    y = y[energy > ionization_potential]
+    indices = np.argwhere(energy > ionization_potential)
+    low_boundary = indices[0][0]
+    x = x[low_boundary:]
+    y = y[low_boundary:]
     
     # Three step fitting
     #q1=0.00015*wavelength**2
@@ -132,9 +134,16 @@ for wavelength in range (800,2001):
     y=np.nan_to_num(y)
     fit, fit_cov = curve_fit(three_step,x,y,p0=initial_guesses)
     plateau_length.append(fit[0])
+<<<<<<< Updated upstream
     #print("{}".format(wavelength))
     #plt.plot(x,y)
     #plt.plot(x,three_step(x,*fit))
+=======
+    print("{}".format(wavelength))
+    plt.plot(x,y)
+    plt.plot(x,three_step(x,*fit))
+    
+>>>>>>> Stashed changes
 
 #%%
 wavelength=np.linspace(800,2000,1201)
