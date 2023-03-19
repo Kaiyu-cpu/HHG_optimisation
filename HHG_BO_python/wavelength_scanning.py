@@ -88,15 +88,15 @@ for wavelength in range (200,2001):
     
     print('{}nm is done!'.format(wavelength))
 #%%
-np.save(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\x_ensemble_Ne.csv",x_ensemble)
-np.save(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\y_ensemble_Ne.csv",y_ensemble)
+np.save(r"D:\HHG_BO_python_spectrum_data\x_ensemble_Ne.csv",x_ensemble)
+np.save(r"D:\HHG_BO_python_spectrum_data\y_ensemble_Ne.csv",y_ensemble)
 #%%
-x_ensemble = np.load(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\x_ensemble_Ne.csv")
-y_ensemble = np.load(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\y_ensemble_Ne.csv")
+x_ensemble = np.load(r"D:\x_ensemble_Ne.csv")
+y_ensemble = np.load(r"D:\y_ensemble_Ne.csv")
 
 #%%
 temp=-1
-for wavelength in range (800,2001):
+for wavelength in range (200,2001):
     temp+=1
     
     if temp%200==0:
@@ -113,7 +113,7 @@ plt.show()
 c = 299792458
 h_bar = 1.054571817e-34
 plateau_length=[]
-for wavelength in range (800,2001):
+for wavelength in range (400,2001):
     x = x_ensemble[wavelength-200]
     y = y_ensemble[wavelength-200]
     
@@ -129,24 +129,19 @@ for wavelength in range (800,2001):
     
     # Three step fitting
     #q1=0.00015*wavelength**2
-    q1 = 5.14e-4*wavelength**2-6.95e-1*wavelength+323
+    q1 = 4.5035e-4*wavelength**2-4.9861e-1*wavelength+190.74
     initial_guesses = [q1,q1+50,-0.1,-60,-80]
     y=np.nan_to_num(y)
     fit, fit_cov = curve_fit(three_step,x,y,p0=initial_guesses)
     plateau_length.append(fit[0])
-<<<<<<< Updated upstream
-    #print("{}".format(wavelength))
+
+    print("{}".format(wavelength))
     #plt.plot(x,y)
     #plt.plot(x,three_step(x,*fit))
-=======
-    print("{}".format(wavelength))
-    plt.plot(x,y)
-    plt.plot(x,three_step(x,*fit))
-    
->>>>>>> Stashed changes
+
 
 #%%
-wavelength=np.linspace(800,2000,1201)
+wavelength=np.linspace(400,2000,1601)
 plt.plot(wavelength,plateau_length)
 plt.xlabel("wavelength(nm)")
 plt.ylabel("plateau length (au)")
@@ -157,7 +152,7 @@ p = np.polyfit(wavelength,plateau_length,2)
 
 #%% fit a quadratic to the curve, get the right shape
 # perform quadratic fit
-plateau_length = np.array([plateau_length]).reshape(1201)
+plateau_length = np.array([plateau_length]).reshape(1601)
 mask = plateau_length >= 0
 wavelength = wavelength[mask]
 plateau_length = plateau_length[mask]
@@ -178,13 +173,13 @@ residuals = f(wavelength)-plateau_length
 outlier_indices = np.where(np.abs(residuals) > 20)
 outlier_waveln = wavelength[outlier_indices]
 outlier_plateau = plateau_length[outlier_indices]
-plt.scatter(wavelength, plateau_length, s=2,label="Data")
-plt.scatter(outlier_waveln,outlier_plateau, s=2,color='purple',label="Outlier")
-plt.plot(wavelength, f(wavelength),color='red', label="Fitted Quadratic")
-plt.legend()
+#plt.scatter(wavelength, plateau_length, s=2,label="Data")
+#plt.scatter(outlier_waveln,outlier_plateau, s=2,color='purple',label="Outlier")
+#plt.plot(wavelength, f(wavelength),color='red', label="Fitted Quadratic")
+#plt.legend()
 plt.show()
 
-for waveln in [1500]:
+for waveln in [600]:
     x = x_ensemble[int(waveln-200)]
     y = y_ensemble[int(waveln-200)]
     
@@ -196,16 +191,19 @@ for waveln in [1500]:
     x = x[energy > ionization_potential]
     y = y[energy > ionization_potential]
     
+    x_new = x[x<=100]
+    y_new = y[x<=100]
     # Three step fitting
-    q1=0.0002*waveln**2
-    initial_guesses = [q1,q1+50,-0.1,-60,-80]
-    y=np.nan_to_num(y)
-    fit, fit_cov = curve_fit(three_step,x,y,p0=initial_guesses)
+    #q1=0.0002*waveln**2
+    q1=40
+    initial_guesses = [q1,q1+20,-0.1,-60,-80]
+    #y=np.nan_to_num(y)
+    fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
     print(fit)
     #plateau_length.append(fit[0])
     print("{}".format(waveln))
-    plt.plot(x,y)
-    plt.plot(x,three_step(x,*fit))
+    plt.plot(x_new,y_new)
+    plt.plot(x_new,three_step(x_new,*fit))
     plt.show()
 
 
