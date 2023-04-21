@@ -1,10 +1,11 @@
+
 # -*- coding: utf-8 -*-
 """
-Created on Thu Mar 16 17:03:44 2023
+Created on Wed Mar 29 16:05:57 2023
 
 @author: Owen
 """
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # add framework path to Python's search path
 import os, sys
@@ -44,52 +45,58 @@ def non_overlap_max_with_index(input_sequence, window_size=80):
         max_values.append(max_value)
         max_indices.append(max_index)
     return max_values, max_indices
+
+def find_zero_level(x,y,q2):
+    zero_level = np.mean(y[x>q2])
+    return zero_level
+    
 #%%
 # set parameters (in SI units)
 
 c = pylewenstein.c
 eps0 = pylewenstein.eps0
 h_bar = 1.054571817e-34
-
-wavelength_0 = 800*1e-9 # 800nm
-fwhm_0 = 30*1e-15 # 30fs
 ionization_potential = 21.5645*pylewenstein.e # 21.5645 eV (Ne)
-E_0 = 2*1e-3 # 2mJ
-spot_0 = 0.01*1e-2 # 0.01cm
-peak_intensity_0 = 2*E_0/(fwhm_0*np.pi*spot_0**2)
 
-wavelength_1 = 800*1e-9 
-fwhm_1 = 30*1e-15
-spot_1 = 0.01*1e-2
+wavelength_1 = 770*1e-9 # 770nm
+fwhm_1 = 30*1e-15 # 30fs
+peak_intensity_1 = 1.333e18 # 1.333e14 W/cm2 
 
+#wavelength_2 = 800*1e-9 
+fwhm_2 = 40*1e-15 # 40fs
+peak_intensity_2 = 1e18 # 1e14 W/cm2
 
-wavelength_2 = 400*1e-9
-fwhm_2 = fwhm_0/np.sqrt(2)
-spot_2 = 0.007*1e-2
+wavelength_3 = 400*1e-9
+fwhm_3 = 20e-15 # 20fs
+peak_intensity_3 = 1e18 # 1e14 W/cm2
+T_3 = wavelength_3/c
 
 # define time axis
-T_1 = wavelength_0/c # one period of carrier
-t = np.linspace(-40.*T_1,40.*T_1,1100*40+1)
-T_2 = wavelength_2/c
+T_1 = wavelength_1/c # one period of carrier
+t = np.linspace(-60.*T_1,60.*T_1,2600*60+1)
+ 
 
-def fitness_func(S,delay,t=t):
-    #S=0.5
-    delay = delay*1e-15 # convert unit to fs
-    # claculate the peak intensity of two waves
-    E_1 = E_0*S 
-    peak_intensity_1 = 2*E_1/(fwhm_1*np.pi*spot_1**2)
-    E_2 = E_0*(1-S)
-    E_2 = (0.2*(E_2/E_0)**2)*1e-3
-    peak_intensity_2 = 2*E_2/(fwhm_2*np.pi*spot_2**2)
-    #print(E_1,E_2)
-    #print(peak_intensity_1,peak_intensity_2)
-
+def fitness_func(delay_12,delay_13,wavelength_2,t=t,plot=False,Print=False,title='',show_driving=False):
+    print('para:', delay_12,delay_13,wavelength_2)
+    
+    #convert to SI unit
+    wavelength_2 = wavelength_2*1e-9
+    delay_12 = delay_12*1e-15 
+    delay_13 = delay_13*1e-15
+    
     # define net drving electric field
     tau_1 = fwhm_1/2./np.sqrt(np.log(np.sqrt(2)))
     Et_1 = np.exp(-(t/tau_1)**2) * np.cos(2*np.pi/T_1*t) * np.sqrt(2*peak_intensity_1/c/eps0)
+    
+    T_2 = wavelength_2/c
     tau_2 = fwhm_2/2./np.sqrt(np.log(np.sqrt(2)))
-    Et_2 = np.exp(-((t-delay)/tau_2)**2) * np.cos(2*np.pi/T_2*t) * np.sqrt(2*peak_intensity_2/c/eps0)
-    Et = Et_1+Et_2
+    Et_2 = np.exp(-((t-delay_12)/tau_2)**2) * np.cos(2*np.pi/T_2*t) * np.sqrt(2*peak_intensity_2/c/eps0)
+    
+    tau_3 = fwhm_3/2./np.sqrt(np.log(np.sqrt(2)))
+    Et_3 = np.exp(-((t-delay_13)/tau_3)**2) * np.cos(2*np.pi/T_3*t) * np.sqrt(2*peak_intensity_3/c/eps0)
+    
+    #Et=Et_1
+    Et = Et_1+Et_2+Et_3
     #plt.plot(t,Et)
     #plt.show()
     
@@ -110,15 +117,16 @@ def fitness_func(S,delay,t=t):
     q = np.fft.fftfreq(len(t), t[1]-t[0])/(1./T_1)
     x = q[q>=0]
     y = abs(np.fft.fft(d)[q>=0])**2
+    y[y==0]=10e-85
     y = np.log10(y)
-    
+    #print(x.shape)
     x_copy = x
     y_copy = y
     
-    x_temp = x[20:]
-    y_temp = y[20:]
-    
-    max_values, max_indices = non_overlap_max_with_index(y_temp,window_size=80)
+    x_temp = x
+    y_temp = y
+
+    max_values, max_indices = non_overlap_max_with_index(y_temp,window_size=240)
     
     y_new = max_values
     x_new = x_temp[max_indices]
@@ -130,101 +138,117 @@ def fitness_func(S,delay,t=t):
     low_boundary = indices[0][0]
     x = x[low_boundary:]
     y = y[low_boundary:]
-    
+    '''
     energy_new = x_new * h_bar * omega_0
     indices_new = np.argwhere(energy_new > ionization_potential)
     low_boundary_new = indices_new[0][0]
     x_new = x_new[low_boundary_new:140]
     y_new = y_new[low_boundary_new:140]
-    
+    '''
     # Three step fitting
-    q1=0.0002856*lambda_center**2-0.1715*lambda_center+38.7331
-    initial_guesses = [q1,q1+10,-0.1,-60,-80]
+    q1=100
+    initial_guesses = [q1,q1+20,-0.1,-65,-85]
     fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
-    plateau_length = fit[0]
-    '''
-    plt.plot(x,y,color='royalblue',lw=0.5)
-    #plt.scatter(x_new,y_new)
-    plt.plot(x,three_step(x,*fit),color='red',lw=3,alpha=0.6)
-    plt.plot(x_copy[:low_boundary],y_copy[:low_boundary],linestyle='--',color='royalblue',lw=0.5)
-    plt.xlim(0,100)
-    plt.grid()
-    plt.xlabel('harmonic orders')
-    plt.ylabel('harmonic yeild (a.u.)')
-    plt.title('Ne single atom dipole response')
-    '''
+    #plateau_length=fit[0]
+    
+    # check the fitting
+    q1,q2,m1,c1,c3 = fit
+    m2 = (c3-m1*q1-c1)/(q2-q1)
+    if abs(m1)<abs(m2) and m1<0 and m2<0 and q1>0 and q2<400:
+        plateau_length = fit[0]
+    else:
+        search_space=[50,80 ,120, 140, 160, 180, 200,250,300,350]
+        for i in search_space:
+            initial_guesses = [i,i+40,-0.1,-65,-85]
+            fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
+            q1,q2,m1,c1,c3 = fit
+            m2 = (c3-m1*q1-c1)/(q2-q1)
+            if abs(m1)<abs(m2) and m1<0 and m2<0 and q1>0 and q2<400:
+                plateau_length = fit[0]
+                break
+    
+    print('fit:',fit)        
     # Calculate the plateau area
-    y=y+80
-    y=10**y
+    zero_level=find_zero_level(x,y,fit[1])
+    y=y-zero_level
+    y_copy=y_copy-zero_level
+    #y=10**y
     area = np.trapz(y[x <= plateau_length], x[x <= plateau_length])
     #area=area+10000
-    #print(area)
+    
+    if plot==True:   
+        plt.plot(x[x<fit[1]],y[x<fit[1]],color='royalblue',lw=0.5,label='spectrum')
+        plt.plot(x[x>=fit[1]],y[x>=fit[1]],linestyle='--',color='orange',lw=0.5,label='numerical noise')
+        #plt.scatter(x_new,y_new)
+        plt.plot(x[x<fit[1]],three_step(x[x<fit[1]],*fit)-zero_level,color='red',lw=3,alpha=0.6,label='fitted line')
+        plt.plot(x_copy[:low_boundary],y_copy[:low_boundary],linestyle='--',color='orange',lw=0.5)
+        #plt.xlim(0,100)
+        plt.grid()
+        plt.legend(loc='upper right')
+        plt.xlabel('harmonic orders')
+        plt.ylabel('harmonic yeild (a.u.)')
+        plt.title(title)
+    
+    if Print==True:
+        print('area = ',area)
+        print('paras :',delay_12,delay_13,wavelength_2)
+    
+    if show_driving == True:
+        plt.plot(t,Et)
+        plt.ylabel("E")
+        plt.xlabel("t")
+    
     return area
 
-#%% grid search
-area=[]
-for i in range (-50,50):
-    area.append(fitness_func(i))
-#%%
-S=np.linspace(-50,50,100)
-plt.plot(S,area)
-plt.xlabel('delay time (fs)')
-plt.ylabel('plateau length (harmonic orders)')
-plt.grid()
-plt.title('plateau length vs delay time')
-    
 #%%BO
 #peak_I: peak itensity in W/cm^2
 #FWHM: width in fs
 #lambda_: wavelength in nm
 
-pbounds = {'S':(0,1),'delay':(-50,50)} # delay in fs
+pbounds = {'wavelength_2':(1200,2000),'delay_12':(-70,70),'delay_13':(-50,50)} # delay in fs
 
 optimizer = BayesianOptimization(
     f=fitness_func,
     pbounds=pbounds,
-    random_state=1,
+    random_state=3,
     allow_duplicate_points=True)
 
-optimizer.maximize(init_points=1,n_iter=300)
+optimizer.maximize(init_points=5,n_iter=300)
 
-#%%
-delays=[]
-for i in range(301):
-    delays.append(optimizer.space.params[i])
-delays=np.array(delays)
-iteration=np.linspace(0,300,301)
-plt.ylabel('delay time (fs)')
-plt.xlabel('iteration')
-# set the thresholds and colors for coloring the bars
-low_threshold = -10
-high_threshold = 30
-low_color = 'b'
-high_color = 'r'
-# create a list of colors for the bars based on their values
-colors = [low_color if y_vals <= low_threshold else high_color if y_vals >= high_threshold else 'g' for y_vals in delays]
-plt.scatter(iteration,delays,color=colors,alpha=0.5)
-plt.grid()
 
 #%%
 plt.plot(range(1, 1 + len(optimizer.space.target)), optimizer.space.target, "-o")
 plt.xlabel('iteration')
-plt.ylabel('plateau length (harmonic orders)')
+plt.ylabel('plateau area (in log space)')
 plt.grid()
 plt.title('Bayesian optimisation learning curve')
 #%% plot the initil and best dipole responce result
 #initial spectrum
 params=optimizer.space.params[0]
-params={'FWHM':params[0],
-        'chirped_coeff':params[1],
-        'lambda_':params[2],
-        'peak_I':params[3]
-        }
-#plot_spectrum_chirped(params)
+fitness_func(params[0],params[1],params[2],plot=True,Print=True,title='initial')
 
 #%%best
 params=optimizer.max['params']
-plot_spectrum_chirped(params,xmin=40,xmax=46)
+params=list(params.values())
+fitness_func(params[0],params[1],params[2],plot=True,Print=True,title='best')
+#plot_spectrum_chirped(params,xmin=40,xmax=46)
+
+#%%
+delay_12=[]
+delay_13=[]
+wavelength_2=[]
+for i in range(305):
+    delay_12.append(optimizer.space.params[i][0])
+    delay_13.append(optimizer.space.params[i][1])
+    wavelength_2.append(optimizer.space.params[i][2])
+    
+iteration=np.linspace(0,304,305)
+#%%
+plt.ylabel('delay_13')
+plt.xlabel('iteration')
+plt.scatter(iteration,delay_13)
+plt.grid()
+
 #%% example
 params={'FWHM':30,
         'lambda_':1000,
