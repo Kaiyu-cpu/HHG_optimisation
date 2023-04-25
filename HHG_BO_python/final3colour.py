@@ -21,6 +21,8 @@ from scipy.interpolate import interp1d
 from scipy import integrate
 from scipy.optimize import curve_fit
 import pandas as pd
+import pygad
+
 
 def three_step(q,q1,q2,m1,c1,c3):
        m2 = (c3-m1*q1-c1)/(q2-q1)
@@ -110,10 +112,10 @@ def fitness_func(I1, I2, I3, delay_12,delay_13, t=t, x=x, plot=False,Print=False
         
         T_2 = wavelength_2/c
         tau_2 = fwhm_2/2./np.sqrt(np.log(np.sqrt(2)))
-        Et_2 = np.exp(-((t-delay_12)/tau_2)**2) * np.cos(2*np.pi/T_2*t) * np.sqrt(2*peak_intensity_2/c/eps0)
+        Et_2 = np.exp(-((t-delay_12)/tau_2)**2) * np.cos(2*np.pi/T_2*(t-delay_12)) * np.sqrt(2*peak_intensity_2/c/eps0)
         
         tau_3 = fwhm_3/2./np.sqrt(np.log(np.sqrt(2)))
-        Et_3 = np.exp(-((t-delay_13)/tau_3)**2) * np.cos(2*np.pi/T_3*t) * np.sqrt(2*peak_intensity_3/c/eps0)
+        Et_3 = np.exp(-((t-delay_13)/tau_3)**2) * np.cos(2*np.pi/T_3*(t-delay_13)) * np.sqrt(2*peak_intensity_3/c/eps0)
         #Et=Et_1
         Et = Et_1+Et_2+Et_3
         
@@ -192,7 +194,7 @@ def fitness_func(I1, I2, I3, delay_12,delay_13, t=t, x=x, plot=False,Print=False
         y_copy=y_copy-zero_level
         
         #cutoff_yield=y_copy[cutoff]
-        mask = (310 <= x_copy) & (x_copy <= 320)
+        mask = (320 <= x_copy) & (x_copy <= 321)
         cutoff_yield=np.mean(y_copy[mask])
         #y=10**y
         #area = np.trapz(10**y[x <= plateau_length], x[x <= plateau_length])
@@ -236,9 +238,15 @@ def fitness_func(I1, I2, I3, delay_12,delay_13, t=t, x=x, plot=False,Print=False
                 'params':params}
             df = pd.DataFrame(a)
             #print(df)
-            df.to_csv('best_harmonic_yeild_data.csv')
+            df.to_csv('best_GA_harmonic_yeild_data.csv')
         
         return cutoff_yield
+
+
+
+
+
+
 
 #%%BO
 #peak_I: peak itensity in W/cm^2
@@ -252,9 +260,11 @@ optimizer = BayesianOptimization(
     pbounds=pbounds,
     random_state=0,
     allow_duplicate_points=True)
-
+import time
+start = time.time()
 optimizer.maximize(init_points=5,n_iter=1000)
-
+end = time.time()
+print(end-start)
 
 #%%
 plt.plot(range(1, 1 + len(optimizer.space.target)), optimizer.space.target, "o")
@@ -300,3 +310,168 @@ params={'FWHM':30,
         'peak_I':1e14}
 plot_spectrum_gaussian(params)
 
+#%% pygad
+
+
+#gene_space = [range(2,2.9),range(0.2,1),range(0.2,1),range(-6,6),range(-6,6)]
+gene_space=[{"low": 2, "high": 2.9},{"low": 0.2, "high": 1},{"low": 0.2, "high": 1},{"low": -6, "high": 6},{"low": -6, "high": 6}]
+
+def fitness_func_train(soln, soln_idx):
+    I1, I2, I3, delay_12, delay_13 = soln
+    print('para:', I1,I2,I3,delay_12,delay_13)
+    x = q[q>=0]
+    if (I1+I2+I3>3.5):
+        return 0
+    else:
+        #convert to SI unit
+        delay_12 = delay_12*1e-15
+        delay_13 = delay_13*1e-15
+        peak_intensity_1 = I1*1e18
+        peak_intensity_2 = I2*1e18
+        peak_intensity_3 = I3*1e18
+        # define net drving electric field
+        tau_1 = fwhm_1/2./np.sqrt(np.log(np.sqrt(2)))
+        Et_1 = np.exp(-(t/tau_1)**2) * np.cos(2*np.pi/T_1*t) * np.sqrt(2*peak_intensity_1/c/eps0)
+        
+        T_2 = wavelength_2/c
+        tau_2 = fwhm_2/2./np.sqrt(np.log(np.sqrt(2)))
+        Et_2 = np.exp(-((t-delay_12)/tau_2)**2) * np.cos(2*np.pi/T_2*(t-delay_12)) * np.sqrt(2*peak_intensity_2/c/eps0)
+        
+        tau_3 = fwhm_3/2./np.sqrt(np.log(np.sqrt(2)))
+        Et_3 = np.exp(-((t-delay_13)/tau_3)**2) * np.cos(2*np.pi/T_3*(t-delay_13)) * np.sqrt(2*peak_intensity_3/c/eps0)
+        #Et=Et_1
+        Et = Et_1+Et_2+Et_3
+        
+        #plt.plot(t,Et)
+        #plt.show()
+        
+        # calculate central wavelength of drving field
+        power_spectrum = np.abs(np.fft.fft(Et))**2
+        freqs = np.fft.fftfreq(len(t), t[1] - t[0])
+        power_spectrum = power_spectrum[freqs>=0]
+        freqs = freqs[freqs>=0]
+        freq_center = np.sum(power_spectrum * freqs) / np.sum(power_spectrum)
+        lambda_center = c / freq_center
+        #print(lambda_center)
+        #plt.plot(freqs,power_spectrum)
+        
+        # use module to calculate dipole response (returns dipole moment in SI units)
+        #lambda_center=1600e-9
+        d = pylewenstein.lewenstein(t,Et,ionization_potential,lambda_center)
+        
+        #fft to get HHG spectrum
+        y = abs(np.fft.fft(d)[q>=0])**2
+        y[y==0]=10e-85
+        y = np.log10(y)
+        #plt.plot(x,y)
+        #print(x.shape)
+        x_copy = x
+        y_copy = y
+        
+        x_temp = x
+        y_temp = y
+    
+        max_values, max_indices = non_overlap_max_with_index(y_temp,window_size=160)
+        
+        y_smooth = max_values
+        x_smooth = x_temp[max_indices]
+        
+        y_smooth = np.array(y_smooth)
+        x_smooth = np.array(x_smooth)
+        
+        # remove low energies 
+        x = x[low_boundary:]
+        y = y[low_boundary:]
+        
+        y_new = y_smooth[x_smooth>=30]
+        x_new = x_smooth[x_smooth>=30]
+        #plt.scatter(x_new,y_new)
+        # Three step fitting
+        q1=320
+        initial_guesses = [q1,q1+60,-0.025,-65,-85]
+        fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
+        #plateau_length=fit[0]
+        
+        # check the fitting
+        q1,q2,m1,c1,c3 = fit
+        m2 = (c3-m1*q1-c1)/(q2-q1)
+        if abs(m1)<abs(m2) and m1<0 and m2<0 and q1>0 and q2<400:
+            plateau_length = fit[0]
+        else:
+            search_space=[200,250,300,310,330,340,350,360]
+            for i in search_space:
+                initial_guesses = [i,i+60,-0.025,-65,-85]
+                fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
+                q1,q2,m1,c1,c3 = fit
+                m2 = (c3-m1*q1-c1)/(q2-q1)
+                if abs(m1)<abs(m2) and m1<0 and m2<0 and q1>0 and q2<500:
+                    plateau_length = fit[0]
+                    break
+        
+        #print('fit:',fit)        
+        # Calculate the plateau area
+        
+        #zero_level=find_zero_level(x,y,fit[1])
+        zero_level=-75
+        y=y-zero_level
+        y_copy=y_copy-zero_level
+        
+        #cutoff_yield=y_copy[cutoff]
+        mask = (320 <= x_copy) & (x_copy <= 321)
+        cutoff_yield=np.mean(y_copy[mask])
+        #y=10**y
+        #area = np.trapz(10**y[x <= plateau_length], x[x <= plateau_length])
+        #area=area+10000
+        
+       
+       
+       
+        
+        return cutoff_yield
+
+
+fitness_function = fitness_func_train
+
+num_generations = 200
+num_parents_mating = 4
+
+sol_per_pop = 8
+num_genes = 5
+
+
+parent_selection_type = "rank"
+keep_parents = 1
+
+crossover_type = "single_point"
+
+mutation_type = "random"
+mutation_percent_genes = 25
+
+import time
+start = time.time()
+
+ga_instance = pygad.GA(num_generations=num_generations,
+                       num_parents_mating=num_parents_mating,
+                       fitness_func=fitness_function,
+                       sol_per_pop=sol_per_pop,
+                       num_genes=num_genes,
+                       parent_selection_type=parent_selection_type,
+                       keep_parents=keep_parents,
+                       crossover_type=crossover_type,
+                       mutation_type=mutation_type,
+                       mutation_percent_genes=mutation_percent_genes,
+                       gene_space = gene_space,
+                       gene_type = float,
+                       save_solutions=True,
+                       keep_elitism=0)
+
+ga_instance.run()
+end = time.time()
+
+print(end-start)
+
+ga_instance.plot_fitness()
+solution, solution_fitness, solution_idx = ga_instance.best_solution()
+
+print("Parameters of the best solution : {solution}".format(solution=solution))
+print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness))
