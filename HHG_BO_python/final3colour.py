@@ -53,7 +53,7 @@ def find_zero_level(x,y,q2):
     zero_level = np.mean(y[x>q2])
     return zero_level
     
-#%%
+#%% BO
 # set parameters (in SI units)
 
 c = pylewenstein.c
@@ -238,7 +238,11 @@ def fitness_func(I1, I2, I3, delay_12,delay_13, t=t, x=x, plot=False,Print=False
                 'params':params}
             df = pd.DataFrame(a)
             #print(df)
+<<<<<<< Updated upstream
             df.to_csv('best_GA_harmonic_yeild_data.csv')
+=======
+            df.to_csv('reference_3_harmonic_yeild_data.csv')
+>>>>>>> Stashed changes
         
         return cutoff_yield
 
