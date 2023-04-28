@@ -59,10 +59,11 @@ ionization_potential = 21.5645*pylewenstein.e # 21.5645 eV (Ne)
 peakintensity = 5e14 * 1e4 # 1e14 W/cm^2
 c = 299792458
 h_bar = 1.054571817e-34
-
+eps0 = 8.8541878128e-12
+me = 9.1093837e-31
 #%%
-x_ensemble = np.load(r"D:\x_ensemble_Ne.csv")
-y_ensemble = np.load(r"D:\y_ensemble_Ne.csv")
+x_ensemble = np.load(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\x_ensemble_Ne.csv")
+y_ensemble = np.load(r"C:\Users\chaof\Downloads\HHG_BO_python_spectrum_data\y_ensemble_Ne.csv")
 #%%
 temp=-1
 for wavelength in range (400,801):
@@ -120,10 +121,12 @@ for wavelength in range (400,2001):
     #threshold = 0.5
     #end_index = np.where(y < threshold*x[low_boundary])[0][0] + low_boundary
     #plateau_length.append(end_index)
-    
-    q1=0.0002856*wavelength**2-0.1715*wavelength+38.7331
+    if wavelength < 1500:
+        q1 = 0.0002856*wavelength**2-0.1715*wavelength+38.7331
+    else:
+        q1=ionization_potential + 3.17 * 2*(pylewenstein.e)**2*peakintensity*(wavelength*1e-9)**2/(16*c**3*eps0*me*np.pi**2)/(2*np.pi*h_bar*c/(wavelength*1e-9))
     #print(q1)
-    initial_guesses = [q1,q1+10,-0.1,-60,-80]
+    initial_guesses = [q1,q1+20,-0.1,-60,-80]
     #y=np.nan_to_num(y)
     fit, fit_cov = curve_fit(three_step,x_new,y_new,p0=initial_guesses)
     #print(fit)
@@ -141,29 +144,53 @@ mask =  plateau_length >= 0
 wavelength = wavelength[mask]
 plateau_length = plateau_length[mask]
 plateau_length = np.delete(plateau_length,508)
+for i in range(len(plateau_length)):
+    if wavelength[i]>1500:
+        plateau_length[i] += 30
 wavelength = np.delete(wavelength,508)
 coeffs = np.polyfit(wavelength, plateau_length, 2)
 
-# generate a function from the fitted coefficients
-f = np.poly1d(coeffs)
+#%%
+# cut-off law
 
+f_pred = ionization_potential + 3.17 * 2*(pylewenstein.e)**2*peakintensity*(wavelength*1e-9)**2/(16*c**3*eps0*me*np.pi**2)
+f_pred = f_pred/(2*np.pi*h_bar*c/(wavelength*1e-9))
 # plot the data and the fitted quadratic
-plt.plot(wavelength, plateau_length,'.',color='royalblue',label="calculated data",alpha=1, markersize=2)
-plt.plot(wavelength, f(wavelength),color='r', label="fitted quadratic",lw=3,alpha=0.5)
-plt.legend()
+#plt.figure(figsize=(16, 10))
+
+
+short_mask = np.ones(len(f_pred),dtype=bool)
+for i in range(len(short_mask)):
+    if i%15 != 0:
+        short_mask[i] = False
+plt.figure(figsize=(10,6))
+wavelen_short = wavelength[short_mask]
+plateau_length_short = plateau_length[short_mask]
+plt.plot(wavelength, f_pred,color='r', label="Cut-off Law",lw=3,alpha=0.7)
+plt.scatter(wavelen_short, plateau_length_short,color='royalblue',label="Lewenstein Model Prediction",s=80,marker='+')
+plt.legend(fontsize=15)
 plt.grid()
-plt.xlabel('wavelength (nm)')
-plt.ylabel("plateau length (harmonic orders)")
+plt.xlabel('wavelength (nm)',fontsize=15)
+plt.ylabel("plateau length (harmonic orders)",fontsize=15)
 plt.show()
 
 #%% check wrong points
-residuals = f(wavelength)-plateau_length
-outlier_indices = np.where(np.abs(residuals) > 2000)
+residuals = f_pred-plateau_length
+outlier_indices = np.where(np.abs(residuals) > 100)
 outlier_waveln = wavelength[outlier_indices]
 outlier_plateau = plateau_length[outlier_indices]
 plt.scatter(wavelength, plateau_length, s=2,label="Data")
 plt.scatter(outlier_waveln,outlier_plateau, s=2,color='purple',label="Outlier")
-plt.plot(wavelength, f(wavelength),color='red', label="Fitted Quadratic")
+plt.plot(wavelength, f_pred,color='red', label="Fitted Quadratic")
+plt.legend()
+plt.show()
+#%%
+mask = np.ones(wavelength.shape, dtype=bool)
+mask[[569,592]] = False
+#plt.scatter(wavelength, plateau_length, s=2,label="Data")
+
+plt.plot(wavelength, f_pred,color='red', label="Cut-off Law")
+plt.scatter(wavelength[mask],plateau_length[mask], s=20,color='blue',label="Lewenstein Model Prediction",marker='+')
 plt.legend()
 plt.show()
 #%%
